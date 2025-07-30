@@ -13,8 +13,11 @@
  * 	ping() is the pinging process handed by the operating system.
  * 	get_net_portion() modifies network address by removing last octet to be filled then
  *      with host portion value. It returns index of last octet placeholder.
- *      generate_ips() generates all 245 ip addresses of the network using ASCII math.
+ *      generate_ips() generates all 245 ip addresses of the network by doing ASCII math.
  */
+
+#define RESPONSE_TIMEOUT "0.1"
+#define CLRSCR "clear"
 
 void	ping(char	hosts_addr[][16], int	row_size, char	online_hosts[][16])
 {
@@ -30,28 +33,23 @@ void	ping(char	hosts_addr[][16], int	row_size, char	online_hosts[][16])
 	 * 	 man ping
 	 * 	 search on the internet for ping exit codes or test it yourself.
 	 */
-	strcpy(command, "ping -c1 -nq -W 0.1 ");
 	for (i = 0; i < row_size; i++)
 	{
-		strcat(command, hosts_addr[i]); // append ip addr to ping command
+		snprintf(command, sizeof(command), "ping -c1 -nq -W %s %s", RESPONSE_TIMEOUT, hosts_addr[i]);
 		exit_code = system(command);
-		system("clear");
-		strcpy(command, "ping -c1 -nq -W 0.1 "); // reassign command for next usage
+		system(CLRSCR);
 		if (exit_code == 0)
 		{
 			strcpy(online_hosts[i], hosts_addr[i]);
 		} else if (exit_code != 0)
 		{
-			online_hosts[i][0] = '!'; // ! = host is down
-						  // it is used to escape printing garbage values
-						  // when printing online hosts
+			online_hosts[i][0] = 0; // 0 = host is down, useful when printing online ones
 		}
 	}
 }
 
 int	get_net_portion(char*	net_addr)
 {
-	printf("running get_net_portion\n");
 	int	host_index;
 	int	n_dots; // number of dots in net_addr, useful to split host and network portions
 	int     i;
@@ -85,7 +83,7 @@ void	generate_ips(char	hosts_addr[][16], char*	network_portion, int	host_index, 
 	int	i;
 
 	host_value = 1; // first host portion value
-	for (i = 0; i < row_size - 2; i++)
+	for (i = 0; i < row_size; i++)
 	{
 		strcpy(hosts_addr[i], network_portion); // assing net portion to element i
 		if (host_value < 10) // ip range [1-9]
@@ -140,12 +138,12 @@ int	main(void)
 	host_index = get_net_portion(net_addr);
 	generate_ips(hosts_addr, net_addr, host_index, row_size);
 	ping(hosts_addr, row_size, online_hosts);
-	system("clear");
+	system(CLRSCR);
 
 	printf("Online hosts:\n");
-	for (i = 0; i < row_size - 2; i++)
+	for (i = 0; i < row_size; i++)
 	{
-		if (online_hosts[i][0] != '!')
+		if (online_hosts[i][0])
 		{
 			printf("%s\n", online_hosts[i]);
 		}
