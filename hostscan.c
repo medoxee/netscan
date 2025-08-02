@@ -4,7 +4,7 @@
 
 #define RESPONSE_TIMEOUT "0.1"
 #define CLRSCR "clear"
-#define MAX_HOSTS 255
+#define MAX_HOSTS 254
 #define MAX_IP_LEN 16
 
 /*
@@ -17,15 +17,14 @@
  * functions:
  * 	ping() is the pinging process handed by the operating system.
  * 	get_net_portion() modifies network address by removing last octet to be filled then
- *      with host portion value. It returns index of last octet placeholder.
- *      generate_ips() generates all 245 ip addresses of the network by doing ASCII math.
+ *      with host portion value.
+ *      generate_ips() generates all 245 ip addresses of the network.
  */
 
-void	ping(char	hosts_addr[][16], int	row_size, char	online_hosts[][16])
+void	ping(char	hosts_addr[][MAX_IP_LEN], char	online_hosts[][MAX_IP_LEN])
 {
-	int	exit_code;
+	int	exit_status;
 	char	command[50];
-	int	i;
 
 	/*
 	 * system() returns a value of the termination status of child shell
@@ -35,63 +34,38 @@ void	ping(char	hosts_addr[][16], int	row_size, char	online_hosts[][16])
 	 * 	 man ping
 	 * 	 search on the internet for ping exit codes or test it yourself.
 	 */
-	for (i = 0; i < row_size; i++)
+	for (int i = 0; i < MAX_HOSTS; i++)
 	{
 		snprintf(command, sizeof(command), "ping -c1 -nq -W %s %s", RESPONSE_TIMEOUT, hosts_addr[i]);
-		exit_code = system(command);
+		exit_status = system(command);
 		system(CLRSCR);
-		if (exit_code == 0)
+		if (exit_status == 0)
 		{
 			strcpy(online_hosts[i], hosts_addr[i]);
-		} else if (exit_code != 0)
+		}
+		else if (exit_status != 0)
 		{
-		        // 0 = host is down, useful when printing online ones
+			// 0 = host is down, useful when printing online ones
 			online_hosts[i][0] = 0;
 		}
 	}
 }
 
-void	generate_ips(char	hosts_addr[][16], char*	network_portion, int	host_index,  int	row_size)
+void	generate_ips(char	hosts_addr[][MAX_IP_LEN], char*	network_portion)
 {
-	int	host_value;
-	int	i;
+	int	host_portion;
 	
         // first host portion value
-	host_value = 1;
-	for (i = 0; i < row_size; i++)
+	host_portion = 1;
+	for (int i = 0; i < MAX_HOSTS; i++)
 	{
-	        // assign net portion to element i
-		strcpy(hosts_addr[i], network_portion);
-		// ip range [1-9]
-		if (host_value < 10)
-		{
-			hosts_addr[i][host_index] = host_value + 48;
-			hosts_addr[i][host_index + 1] = '\0';
-		}
-		// ip range [10-99]
-		else if (host_value > 9 && host_value < 100)
-		{
-			hosts_addr[i][host_index] = (host_value / 10) + 48;
-			hosts_addr[i][host_index + 1] = (host_value % 10) + 48;
-			hosts_addr[i][host_index + 2] = '\0';
-		}
-		// ip range [100-255]
-		else if (host_value > 99)
-		{
-			hosts_addr[i][host_index] = (host_value / 100) + 48;
-			hosts_addr[i][host_index + 1] = ((host_value % 100) / 10) + 48; 
-			hosts_addr[i][host_index + 2] = (host_value % 10) + 48;
-			hosts_addr[i][host_index + 3] = '\0';
-		}
-		host_value++;
+		snprintf(hosts_addr[i], sizeof(hosts_addr[MAX_HOSTS]), "%s%d", network_portion, host_portion);
+		host_portion++;
 	}
-	// set last item to 0 instead of ...255 to get rid of broadcast ip
-	hosts_addr[row_size - 1][0] = '\0';
 }
 
-int	get_net_portion(char*	net_addr)
+void	get_net_portion(char*	net_addr)
 {
-	int	host_index;
 	int	n_dots;
 	int     i;
 
@@ -99,9 +73,8 @@ int	get_net_portion(char*	net_addr)
 	n_dots = 0;
 	/*
 	 * n_dots = number of dots in net_addr, useful to split host and network portions.
-	 * loop below scans for dots in network address
-	 * when n_dots == 3, replace the next item(192.168.1.0: in this case 0) with
-	 * null terminator to replace it then with host portion
+	 * loop below scans for dots in network address,
+	 * when n_dots == 3, replace the next item(192.168.1.0: in this case 0) with NUL
 	 */
 	while (net_addr[i])
 	{
@@ -115,46 +88,35 @@ int	get_net_portion(char*	net_addr)
 		}
 		i++;
 	}
-	host_index = i;
-	return host_index;
 }
 
-int	main(void)
+int	main(int	argc, char**	argv)
 {
-	/*
-	 * those variables are valide to networks with /24 notation.
-	 * host_id represents the last octet in the network ip address
-	 * net_addr be like ...0
-	 * hosts_addr represents all ips in range of /24 network
-	 * row_size is the size of hosts_addr[][] row
-	 */
-	char	host_id[4];
 	char	net_addr[MAX_IP_LEN];
 	char	hosts_addr[MAX_HOSTS][MAX_IP_LEN];
-	int	host_index;
-	int	row_size;
 	char	online_hosts[MAX_HOSTS][MAX_IP_LEN];
-	int	i;
 
-	host_id[3] = '\0';
-	row_size = sizeof(hosts_addr) / sizeof(hosts_addr[0]);
-	
-	// wait for user input
-	printf("Network address to scan(only networks with /24 notation!): ");
-	fgets(net_addr, sizeof(net_addr), stdin);
-
-	host_index = get_net_portion(net_addr);
-	generate_ips(hosts_addr, net_addr, host_index, row_size);
-	ping(hosts_addr, row_size, online_hosts);
+	if (argc == 2)
+	{
+		strcpy(net_addr, argv[1]);
+	}
+	else
+	{
+		printf("Error: bad or missing argument\n");
+		return 1;
+	}
+	get_net_portion(net_addr);
+	generate_ips(hosts_addr, net_addr);
+	ping(hosts_addr, online_hosts);
 	system(CLRSCR);
 
 	printf("Online hosts:\n");
-	for (i = 0; i < row_size; i++)
+	for (int i = 0; i < MAX_HOSTS; i++)
 	{
 		if (online_hosts[i][0])
 		{
-			printf("%s\n", online_hosts[i]);
+			printf("  %s\n", online_hosts[i]);
 		}
 	}
-	return (0);
+	return 0;
 }
