@@ -2,8 +2,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Detecting current Operating System
+#define OS_ERROR 0
+/*
+#define IS_LINUX 0
+#define IS_WIN 0
+*/
+#if defined(__linux__)
+	#define IS_LINUX 1
+	#define IS_WIN 0
+	#define CLRSCR "clear"
+#elif defined(_WIN32)
+	#define IS_LINUX 0
+	#define IS_WIN 1
+	#define	CLRSCR "cls"
+#else
+	// in case of os detection error, exit program
+	#define OS_ERROR 1
+#endif
 #define RESPONSE_TIMEOUT "0.1"
-#define CLRSCR "clear"
 #define MAX_HOSTS 254
 #define MAX_IP_LEN 16
 
@@ -16,12 +33,13 @@
  * for the ping process and it might be upgraded later to be based on low level ping process.
  * functions:
  * 	ping() is the pinging process handed by the operating system.
+ * 	ping_config() has the configuration needed for ping process (based on OS).
  * 	get_net_portion() modifies network address by removing last octet to be filled then
  *      with host portion value.
  *      generate_ips() generates all 245 ip addresses of the network.
  */
 
-void	ping(char	hosts_addr[][MAX_IP_LEN], char	online_hosts[][MAX_IP_LEN])
+void	ping(char*	cmd, char*	potn, char	hosts_addr[][MAX_IP_LEN], char	online_hosts[][MAX_IP_LEN])
 {
         /*
 	 * system() returns a value of the termination status of child shell used to
@@ -32,13 +50,13 @@ void	ping(char	hosts_addr[][MAX_IP_LEN], char	online_hosts[][MAX_IP_LEN])
 	 *  search on the internet for ping exit status or test it yourself.
 	 */
 	int	exit_status;
-	char	command[50];
+	char	full_cmd[50];
 
 	printf("scanning for online hosts. Estimated time: 30s\n");
 	for (int i = 0; i < MAX_HOSTS; i++)
 	{
-		snprintf(command, sizeof(command), "ping -c1 -nq -W %s %s > /dev/null", RESPONSE_TIMEOUT, hosts_addr[i]);
-		exit_status = system(command);
+		snprintf(full_cmd, sizeof(full_cmd), "%s %s %s", cmd, hosts_addr[i], potn);
+		exit_status = system(full_cmd);
 		if (exit_status == 0)
 		{
 			strcpy(online_hosts[i], hosts_addr[i]);
@@ -48,6 +66,21 @@ void	ping(char	hosts_addr[][MAX_IP_LEN], char	online_hosts[][MAX_IP_LEN])
 			// 0 = host is down, useful when printing online ones
 			online_hosts[i][0] = 0;
 		}
+	}
+}
+
+void	ping_config(char*	cmd, int	cmd_size, char*	potn)
+{
+	if (IS_LINUX)
+	{
+		snprintf(cmd, cmd_size, "ping -c1 -nq -W %s", RESPONSE_TIMEOUT);
+		strcpy(potn, "> /dev/null");
+	}
+	else if (IS_WIN)
+	{
+		// if in windows output is not showing up, delet "> nul" in cmd bellow
+		snprintf(cmd, cmd_size, "ping -n 1 -w %s", RESPONSE_TIMEOUT);
+		strcpy(potn, "> nul");
 	}
 }
 
@@ -79,27 +112,28 @@ void	get_net_portion(char*	net_addr)
 	while (net_addr[i])
 	{
 		if (net_addr[i] == '.')
-		{
 			n_dots++;
-		}
 		if (n_dots == 3)
-		{
 			net_addr[i + 1] = '\0';
-		}
 		i++;
 	}
 }
 
 int	main(int	argc, char**	argv)
 {
+	char	cmd[50]; // ping (OS based) command but without ip and potn
+	char	potn[20]; // Ping Output To Null (potn)
 	char	net_addr[MAX_IP_LEN];
 	char	hosts_addr[MAX_HOSTS][MAX_IP_LEN];
 	char	online_hosts[MAX_HOSTS][MAX_IP_LEN];
 
-	if (argc == 2 && strlen(argv[1]) >= 7)
+	if (OS_ERROR)
 	{
-		strcpy(net_addr, argv[1]);
+		printf("Error, OS detection failed!\n");
+		return 2;
 	}
+	if (argc == 2 && strlen(argv[1]) >= 7)
+		strcpy(net_addr, argv[1]);
 	else
 	{
 		printf("Error: bad or missing argument!\n");
@@ -107,16 +141,14 @@ int	main(int	argc, char**	argv)
 	}
 	get_net_portion(net_addr);
 	generate_ips(hosts_addr, net_addr);
-	ping(hosts_addr, online_hosts);
-	system(CLRSCR);
+	ping_config(cmd, sizeof(cmd), potn);
+	ping(cmd, potn, hosts_addr, online_hosts);
 
 	printf("Online hosts:\n");
 	for (int i = 0; i < MAX_HOSTS; i++)
 	{
 		if (online_hosts[i][0])
-		{
 			printf("%s\n", online_hosts[i]);
-		}
 	}
 	return 0;
 }
