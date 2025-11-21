@@ -4,10 +4,6 @@
 
 // Detecting current Operating System
 #define OS_ERROR 0
-/*
-#define IS_LINUX 0
-#define IS_WIN 0
-*/
 #if defined(__linux__)
 	#define IS_LINUX 1
 	#define IS_WIN 0
@@ -20,13 +16,12 @@
 	// in case of os detection error, exit program
 	#define OS_ERROR 1
 #endif
-#define RESPONSE_TIMEOUT "0.1"
 #define MAX_HOSTS 254
 #define MAX_IP_LEN 16
 
 /*
  *                              IN THE NAME OF ALLAH,
- * Date: 12-07-2025
+ * History: 12-07-2025
  * Developer: MOHAMED ARRAF (https://www.linkedin.com/in/mohamedarraf)
  * Description: Scan for available nodes on the network.
  * Please note that this program is still under development, for now, it is based on OS level
@@ -52,15 +47,12 @@ void	ping(char*	cmd, char*	potn, char	hosts_addr[][MAX_IP_LEN], char	online_host
 	int	exit_status;
 	char	full_cmd[50];
 
-	printf("scanning for online hosts. Estimated time: 30s\n");
 	for (int i = 0; i < MAX_HOSTS; i++)
 	{
 		snprintf(full_cmd, sizeof(full_cmd), "%s %s %s", cmd, hosts_addr[i], potn);
 		exit_status = system(full_cmd);
 		if (exit_status == 0)
-		{
 			strcpy(online_hosts[i], hosts_addr[i]);
-		}
 		else
 		{
 			// 0 = host is down, useful when printing online ones
@@ -69,17 +61,17 @@ void	ping(char*	cmd, char*	potn, char	hosts_addr[][MAX_IP_LEN], char	online_host
 	}
 }
 
-void	ping_config(char*	cmd, int	cmd_size, char*	potn)
+void	ping_config(char*	cmd, int	cmd_size, char*	potn, char*	response_timeout)
 {
 	if (IS_LINUX)
 	{
-		snprintf(cmd, cmd_size, "ping -c1 -nq -W %s", RESPONSE_TIMEOUT);
+		snprintf(cmd, cmd_size, "ping -c1 -nq -W %s", response_timeout);
 		strcpy(potn, "> /dev/null");
 	}
 	else if (IS_WIN)
 	{
 		// if in windows output is not showing up, delet "> nul" in cmd bellow
-		snprintf(cmd, cmd_size, "ping -n 1 -w %s", RESPONSE_TIMEOUT);
+		snprintf(cmd, cmd_size, "ping -n 1 -w %s", response_timeout);
 		strcpy(potn, "> nul");
 	}
 }
@@ -123,6 +115,7 @@ int	main(int	argc, char**	argv)
 {
 	char	cmd[50]; // ping (OS based) command but without ip and potn
 	char	potn[20]; // Ping Output To Null (potn)
+	char	response_timeout[10]; // timeout of ping if no response is received
 	char	net_addr[MAX_IP_LEN];
 	char	hosts_addr[MAX_HOSTS][MAX_IP_LEN];
 	char	online_hosts[MAX_HOSTS][MAX_IP_LEN];
@@ -132,16 +125,25 @@ int	main(int	argc, char**	argv)
 		printf("Error, OS detection failed!\n");
 		return 2;
 	}
-	if (argc == 2 && strlen(argv[1]) >= 7)
+	if (argc == 3 && strlen(argv[1]) >= 7 && !(strlen(argv[2]) > 9))
+	{
 		strcpy(net_addr, argv[1]);
+		strcpy(response_timeout, argv[2]);
+	}
 	else
 	{
+		// printf("argc == %d\nargv[1] == %s\nargv[2] == %s", argc, argv[1], argv[2]);
 		printf("Error: bad or missing argument!\n");
+		printf("Usage: %s <ip_address> <timeout>\n", argv[0]);
+		printf("Note: timeout for linux(seconds), for windows(ms)\n");
+		printf("Example:\n%s 192.168.0.0 0.1\n%s 10.0.0.0 1\n", argv[0], argv[0]);
 		return 1;
 	}
 	get_net_portion(net_addr);
 	generate_ips(hosts_addr, net_addr);
-	ping_config(cmd, sizeof(cmd), potn);
+	ping_config(cmd, sizeof(cmd), potn, response_timeout);
+	printf("netscan by @medoxe (https://www.linkedin.com/in/mohamedarraf)\n");
+	printf("Scanning for online hosts. Estimated time: 30s\n");
 	ping(cmd, potn, hosts_addr, online_hosts);
 
 	printf("Online hosts:\n");
